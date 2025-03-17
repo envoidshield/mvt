@@ -66,6 +66,13 @@ class DumpsysPackagesArtifact(AndroidArtifact):
             "timestamp": "",
             "first_install_time": "",
             "last_update_time": "",
+            "code_path": "",
+            "signature_info": {
+                "version": None,
+                "signatures": [],
+                "past_signatures": []
+            },
+            "installer_package": "",
             "permissions": [],
             "requested_permissions": [],
         }
@@ -133,6 +140,35 @@ class DumpsysPackagesArtifact(AndroidArtifact):
                 in_declared_permissions = True
             elif line.strip() == "requested permissions:":
                 in_requested_permissions = True
+            elif line.strip().startswith("codePath="):
+                details["code_path"] = line.split("=")[1].strip()
+            elif line.strip().startswith("signatures="):
+                # Handle new signature format: PackageSignatures{9122424 version:2, signatures:[bbb2e2d2], past signatures:[]}
+                sig_line = line.split("=")[1].strip()
+                
+                # Extract signature version
+                if "version:" in sig_line:
+                    version_match = re.search(r"version:(\d+)", sig_line)
+                    if version_match:
+                        details["signature_info"]["version"] = int(version_match.group(1))
+                
+                # Extract current signatures
+                if "signatures:[" in sig_line:
+                    sigs_match = re.search(r"signatures:\[(.*?)\]", sig_line)
+                    if sigs_match:
+                        # Split by comma and remove whitespace
+                        signatures = [s.strip() for s in sigs_match.group(1).split(",")]
+                        details["signature_info"]["signatures"] = signatures
+                
+                # Extract past signatures if available
+                if "past signatures:[" in sig_line:
+                    past_sigs_match = re.search(r"past signatures:\[(.*?)\]", sig_line)
+                    if past_sigs_match:
+                        # Split by comma and remove whitespace
+                        past_signatures = [s.strip() for s in past_sigs_match.group(1).split(",") if s.strip()]
+                        details["signature_info"]["past_signatures"] = past_signatures
+            elif line.strip().startswith("installerPackageName="):
+                details["installer_package"] = line.split("=")[1].strip()
 
         return details
 
@@ -200,3 +236,5 @@ class DumpsysPackagesArtifact(AndroidArtifact):
             package.append(line)
 
         self.results = self.parse_dumpsys_packages("\n".join(package))
+
+
